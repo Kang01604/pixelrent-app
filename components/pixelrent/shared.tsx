@@ -789,12 +789,6 @@ export function Footer() {
   return (
     <footer className="bg-gradient-to-r from-[#18091f] to-[#291931]">
       <div className="mx-auto flex max-w-[1800px] flex-col items-center gap-3 px-4 pb-8 pt-9 sm:px-8">
-        <div className="flex items-center gap-5">
-          {SOCIAL_LINKS.map((link) => (
-            <SocialButton key={link.id} link={link} />
-          ))}
-        </div>
-
         <p className="flex flex-wrap items-baseline justify-center gap-x-1.5 font-condensed text-base text-white">
           <span>© 2025</span>
           <a
