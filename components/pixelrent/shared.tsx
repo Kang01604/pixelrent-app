@@ -596,6 +596,7 @@ export function Header({
   cartCount = 0,
   onAuth,
   loggedIn = false,
+  authReady = true,
   onLogout,
   notifications,
   onNotificationsOpened,
@@ -606,6 +607,7 @@ export function Header({
   cartCount?: number;
   onAuth?: (mode: "login" | "register") => void;
   loggedIn?: boolean;
+  authReady?: boolean;
   onLogout?: () => void;
   notifications?: AppNotification[];
   onNotificationsOpened?: () => void;
@@ -662,7 +664,11 @@ export function Header({
             )}
           </button>
 
-          {loggedIn ? (
+          {!authReady ? (
+            /* Auth state not resolved yet — reserve space, show nothing,
+               so we never flash the logged-out buttons on refresh. */
+            <div className="h-10 w-10" aria-hidden />
+          ) : loggedIn ? (
             /* Profile avatar + dropdown (Settings is a stub; Logout logs out) */
             <ProfileMenu
               onLogout={onLogout}
@@ -735,7 +741,7 @@ export function Header({
               />
             ))}
           </div>
-          {!loggedIn && (
+          {authReady && !loggedIn && (
             <div className="mt-4 flex gap-3 sm:hidden">
               <PillButton
                 variant="dark"

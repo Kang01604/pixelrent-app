@@ -14,6 +14,9 @@ export default function PixelRentApp() {
   const [page, setPage] = useState<PageId>("home");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [user, setUser] = useState<UserProfile | null>(null);
+  // False until Firebase reports the auth state once — prevents the
+  // header from flashing the logged-out buttons on refresh.
+  const [authReady, setAuthReady] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   /* Which game's cart rows to highlight after arriving via "In Cart ✓" */
@@ -45,6 +48,7 @@ export default function PixelRentApp() {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser) {
         setUser(null);
+        setAuthReady(true);
         return;
       }
       try {
@@ -52,6 +56,8 @@ export default function PixelRentApp() {
         if (snap.exists()) setUser(snap.data() as UserProfile);
       } catch {
         /* offline / rules — leave user as-is */
+      } finally {
+        setAuthReady(true);
       }
     });
     return unsub;
@@ -138,6 +144,7 @@ export default function PixelRentApp() {
   const headerProps = {
     onAuth: openAuth,
     loggedIn,
+    authReady,
     onLogout: logout,
     notifications,
     onNotificationsOpened: markNotificationsRead,
