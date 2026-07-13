@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import Homepage from "./Homepage";
 import BrowseGames, { Game, CartItem, cartRowKey } from "./BrowseGames";
 import CartPage from "./CartPage";
@@ -9,6 +9,12 @@ import { AuthModal, PageId, UserProfile, AppNotification } from "./shared";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../lib/firebase";
+
+// useLayoutEffect on the client (runs before paint), useEffect on the
+// server (avoids the SSR warning). Used to restore the saved page
+// before the first paint so there's no homepage flash.
+const useBrowserLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export default function PixelRentApp() {
   const [page, setPage] = useState<PageId>("home");
@@ -24,6 +30,31 @@ export default function PixelRentApp() {
   const [checkoutRequested, setCheckoutRequested] = useState(false);
 
   const loggedIn = user !== null;
+
+  /* Remember the current page across refreshes. Restore in a layout
+     effect (before paint) so the homepage never flashes first. */
+  useBrowserLayoutEffect(() => {
+    try {
+      const saved = localStorage.getItem("pixelrent-page");
+      if (
+        saved === "home" ||
+        saved === "products" ||
+        saved === "cart" ||
+        saved === "settings"
+      ) {
+        setPage(saved);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("pixelrent-page", page);
+    } catch {
+      /* ignore */
+    }
+  }, [page]);
 
   /* Cart survives refreshes via localStorage (client-side only). */
   useEffect(() => {

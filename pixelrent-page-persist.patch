@@ -1,5 +1,5 @@
 diff --git a/components/pixelrent/PixelRentApp.tsx b/components/pixelrent/PixelRentApp.tsx
-index 80ef433..538b8c1 100644
+index 80ef433..615e0d0 100644
 --- a/components/pixelrent/PixelRentApp.tsx
 +++ b/components/pixelrent/PixelRentApp.tsx
 @@ -1,6 +1,6 @@
@@ -10,7 +10,7 @@ index 80ef433..538b8c1 100644
  import Homepage from "./Homepage";
  import BrowseGames, { Game, CartItem, cartRowKey } from "./BrowseGames";
  import CartPage from "./CartPage";
-@@ -10,10 +10,19 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
+@@ -10,6 +10,12 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
  import { doc, getDoc } from "firebase/firestore";
  import { auth, db } from "../../lib/firebase";
  
@@ -23,14 +23,7 @@ index 80ef433..538b8c1 100644
  export default function PixelRentApp() {
    const [page, setPage] = useState<PageId>("home");
    const [cart, setCart] = useState<CartItem[]>([]);
-   const [user, setUser] = useState<UserProfile | null>(null);
-+  // False until Firebase reports the auth state once — prevents the
-+  // header from flashing the logged-out buttons on refresh.
-+  const [authReady, setAuthReady] = useState(false);
-   const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
-   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-   /* Which game's cart rows to highlight after arriving via "In Cart ✓" */
-@@ -22,6 +31,31 @@ export default function PixelRentApp() {
+@@ -22,6 +28,31 @@ export default function PixelRentApp() {
  
    const loggedIn = user !== null;
  
@@ -62,28 +55,3 @@ index 80ef433..538b8c1 100644
    /* Cart survives refreshes via localStorage (client-side only). */
    useEffect(() => {
      try {
-@@ -45,6 +79,7 @@ export default function PixelRentApp() {
-     const unsub = onAuthStateChanged(auth, async (fbUser) => {
-       if (!fbUser) {
-         setUser(null);
-+        setAuthReady(true);
-         return;
-       }
-       try {
-@@ -52,6 +87,8 @@ export default function PixelRentApp() {
-         if (snap.exists()) setUser(snap.data() as UserProfile);
-       } catch {
-         /* offline / rules — leave user as-is */
-+      } finally {
-+        setAuthReady(true);
-       }
-     });
-     return unsub;
-@@ -138,6 +175,7 @@ export default function PixelRentApp() {
-   const headerProps = {
-     onAuth: openAuth,
-     loggedIn,
-+    authReady,
-     onLogout: logout,
-     notifications,
-     onNotificationsOpened: markNotificationsRead,
