@@ -1,6 +1,6 @@
-# PixelRent — video game rental (Next.js 14, simulated backend)
+# PixelRent — video game rental store
 
-Dark neon storefront for renting games: browse by platform, configure rent
+E-commerce storefront for renting games: browse by platform, configure rent
 dates per copy, cart, simulated checkout with PH VAT, simulated accounts,
 profile settings, and order notifications.
 
