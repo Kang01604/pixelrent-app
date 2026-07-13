@@ -530,23 +530,7 @@ function FilterPanel({
 
 /* ----------------------- Game info popup ----------------------- */
 
-function ReviewItem({
-  review,
-  loggedIn,
-  onRequireLogin,
-}: {
-  review: Review;
-  loggedIn: boolean;
-  onRequireLogin: () => void;
-}) {
-  const [liked, setLiked] = useState(false);
-  const handleLike = () => {
-    if (!loggedIn) {
-      onRequireLogin();
-      return;
-    }
-    setLiked((v) => !v);
-  };
+function ReviewItem({ review }: { review: Review }) {
   return (
     <li className="flex gap-4 border-b border-white/15 px-4 py-3">
       {/* avatar slot — intentionally blank */}
@@ -571,25 +555,6 @@ function ReviewItem({
         </p>
         <p className="truncate text-sm text-[#f2f2f2]/70">{review.line2}</p>
       </div>
-
-      <button
-        type="button"
-        onClick={handleLike}
-        aria-label={liked ? "Unlike review" : "Like review"}
-        aria-pressed={liked}
-        className="self-center rounded-md p-1 outline-none transition hover:scale-110
-                   focus-visible:ring-2 focus-visible:ring-[#15f5ea] active:scale-90"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          className={`h-5 w-5 transition ${liked ? "fill-[#ff4d6d] text-[#ff4d6d]" : "fill-none text-white/70"}`}
-          stroke="currentColor"
-          strokeWidth="2"
-          aria-hidden="true"
-        >
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-        </svg>
-      </button>
     </li>
   );
 }
@@ -876,8 +841,6 @@ function GameInfoModal({
   onAddToCart,
   inCart,
   onGoToCart,
-  loggedIn,
-  onAuth,
   onCheckoutRequested,
 }: {
   game: Game;
@@ -890,7 +853,6 @@ function GameInfoModal({
   onCheckoutRequested: () => void;
 }) {
   const [configMode, setConfigMode] = useState<"cart" | "checkout" | null>(null);
-  const [wishlisted, setWishlisted] = useState(false);
 
   /* Reviews are seeded in Firestore and served by /api/reviews.
      Load them when this game's modal opens. */
@@ -1020,6 +982,9 @@ function GameInfoModal({
                   <p className="mt-1 font-condensed text-base font-thin text-white/80">
                     {reviewCount} Reviews
                   </p>
+                  <p className="mt-0.5 font-condensed text-xs font-thin uppercase tracking-wide text-white/50">
+                    Powered by RAWG
+                  </p>
                 </div>
                 <p className="flex items-center gap-3 font-condensed text-4xl font-light text-white sm:text-5xl">
                   <StarIcon className="h-8 w-8 sm:h-9 sm:w-9" />
@@ -1032,12 +997,7 @@ function GameInfoModal({
                   <li className="px-4 py-3 text-sm text-white/70">Loading reviews…</li>
                 ) : (
                   reviews.map((review, i) => (
-                    <ReviewItem
-                      key={i}
-                      review={review}
-                      loggedIn={loggedIn}
-                      onRequireLogin={() => onAuth("login")}
-                    />
+                    <ReviewItem key={i} review={review} />
                   ))
                 )}
               </ul>
@@ -1050,37 +1010,10 @@ function GameInfoModal({
                 backgroundImage: `linear-gradient(135deg, ${game.gradient.from}, ${game.gradient.to})`,
               }}
             >
-              {/* Heading sits on the same line as — and matches — the heart/share icons */}
               <div className="flex items-center justify-between">
                 <h2 className="font-condensed text-3xl font-bold text-white sm:text-4xl">
                   Rent the Game?
                 </h2>
-                <div className="flex items-center gap-3 text-white">
-                  <button
-                    type="button"
-                    aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
-                    onClick={() => {
-                      if (!loggedIn) {
-                        onAuth("login");
-                        return;
-                      }
-                      setWishlisted((v) => !v);
-                    }}
-                    className={`rounded-md p-1 outline-none transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-[#15f5ea] active:scale-90 ${wishlisted ? "text-[#ff4d6d]" : "text-white"}`}
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill={wishlisted ? "currentColor" : "none"}
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="h-7 w-7"
-                      aria-hidden="true"
-                    >
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                    </svg>
-                  </button>
-                  
-                </div>
               </div>
 
               <div className="mt-4 flex items-end justify-between gap-4">
