@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db } from "../../lib/firebase";
 
 /* ============================================================
    PixelRent — shared components (header, footer, buttons, icons)
@@ -1141,8 +1147,9 @@ export function AuthModal({
     return Object.keys(e).length === 0;
   };
 
-  /* Auth is SIMULATED server-side — the API validates and returns a
-     profile, but nothing is saved to a database. */
+  /* Auth is REAL — Firebase Authentication (email/password) plus a
+     Firestore `users/{uid}` profile document. The session persists
+     across refreshes automatically. */
   const submit = async () => {
     setError("");
     if (busy) return;
@@ -1154,17 +1161,25 @@ export function AuthModal({
         setErrors(e);
         if (Object.keys(e).length > 0) return;
         setBusy(true);
-        const res = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setErrors(data.errors ?? {});
-          return;
-        }
-        onLogin(data.profile);
+
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const snap = await getDoc(doc(db, "users", cred.user.uid));
+        const profile = snap.exists()
+          ? (snap.data() as UserProfile)
+          : // Fallback for accounts created outside the app.
+            {
+              username: email.split("@")[0],
+              firstName: "",
+              lastName: "",
+              email: cred.user.email ?? email,
+              phone: "",
+              gender: "",
+              dob: "",
+              addresses: [],
+              defaultAddressId: null,
+              avatarUrl: "",
+            };
+        onLogin(profile);
         onClose();
         return;
       }
@@ -1172,31 +1187,41 @@ export function AuthModal({
       if (!validateStep2()) return;
       setBusy(true);
       const addr: Address = { ...address, firstName, lastName, phone };
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          email,
-          password,
-          firstName,
-          lastName,
-          phone,
-          gender,
-          dob,
-          address: addr,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setErrors(data.errors ?? {});
-        setError("Please fix the highlighted fields.");
-        return;
-      }
-      onLogin(data.profile);
+
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const profile: UserProfile = {
+        username,
+        firstName,
+        lastName,
+        email: email.trim(),
+        phone,
+        gender,
+        dob,
+        addresses: [addr],
+        defaultAddressId: addr.id,
+        avatarUrl: "",
+      };
+      await setDoc(doc(db, "users", cred.user.uid), profile);
+
+      onLogin(profile);
       onClose();
-    } catch {
-      setError("Something went wrong. Is the dev server running?");
+    } catch (err) {
+      const code = (err as { code?: string })?.code ?? "";
+      if (code === "auth/email-already-in-use") {
+        setErrors({ email: "That email is already registered." });
+        setError("Please fix the highlighted fields.");
+      } else if (code === "auth/invalid-credential" || code === "auth/wrong-password") {
+        setErrors({ password: "Incorrect email or password." });
+      } else if (code === "auth/user-not-found") {
+        setErrors({ email: "No account found for that email." });
+      } else if (code === "auth/too-many-requests") {
+        setError("Too many attempts. Please wait a moment and try again.");
+      } else if (code === "auth/weak-password") {
+        setErrors({ password: "Password must be at least 8 characters." });
+        setError("Please fix the highlighted fields.");
+      } else {
+        setError("Something went wrong. Check your connection and try again.");
+      }
     } finally {
       setBusy(false);
     }

@@ -20,7 +20,7 @@ export type Game = {
   coverUrl: string;
   publisher: string;
   description: string;
-  itemsLeft: number; // initial stock — live stock lives in simstore
+  itemsLeft: number; // starting stock — live stock lives in Firestore (games collection)
   sales: number;
   addedAt: number;
 };

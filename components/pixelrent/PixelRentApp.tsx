@@ -6,6 +6,9 @@ import BrowseGames, { Game, CartItem, cartRowKey } from "./BrowseGames";
 import CartPage from "./CartPage";
 import SettingsPage from "./SettingsPage";
 import { AuthModal, PageId, UserProfile, AppNotification } from "./shared";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../../lib/firebase";
 
 export default function PixelRentApp() {
   const [page, setPage] = useState<PageId>("home");
@@ -35,6 +38,24 @@ export default function PixelRentApp() {
       /* storage full/blocked — cart stays in memory */
     }
   }, [cart]);
+
+  /* Restore the signed-in user on refresh. Firebase persists the
+     session; we re-hydrate the profile from Firestore. */
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      if (!fbUser) {
+        setUser(null);
+        return;
+      }
+      try {
+        const snap = await getDoc(doc(db, "users", fbUser.uid));
+        if (snap.exists()) setUser(snap.data() as UserProfile);
+      } catch {
+        /* offline / rules — leave user as-is */
+      }
+    });
+    return unsub;
+  }, []);
 
   /* Merge copies into rows: same game + same end date = one row
      (qty goes up); a different end date creates its own row. */
@@ -74,7 +95,12 @@ export default function PixelRentApp() {
     setCart((prev) => prev.filter((c) => !keys.includes(cartRowKey(c))));
 
   const openAuth = (mode: "login" | "register") => setAuthMode(mode);
-  const logout = () => setUser(null);
+  const logout = () => {
+    signOut(auth).catch(() => {
+      /* ignore — local state is cleared regardless */
+    });
+    setUser(null);
+  };
 
   /* "In Cart" in the game popup -> jump to the cart and pulse that game. */
   const viewInCart = (id: string) => {

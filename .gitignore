@@ -41,3 +41,11 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# firebase service-account keys — NEVER commit
+*firebase-adminsdk*.json
+serviceAccountKey.json
+*-service-account.json
+
+# the integration patch (not needed in repo)
+pixelrent-firebase.patch

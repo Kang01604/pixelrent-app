@@ -1,12 +1,25 @@
 import { NextResponse } from "next/server";
-import { CATALOG } from "../../../lib/catalog";
-import { getStock } from "../../../lib/simstore";
+import { adminDb } from "../../../lib/firebaseAdmin";
+import type { Game } from "../../../lib/catalog";
 
-/* Stock is live — never let Next prerender this route statically. */
+/* Stock is live in Firestore — never prerender statically. */
 export const dynamic = "force-dynamic";
 
-/** GET /api/games — the catalog with live (simulated) stock. */
+/** GET /api/games — the catalog with live stock from Firestore.
+    Run `npx tsx scripts/seed.ts` once to populate the `games`
+    collection before this returns anything. */
 export async function GET() {
-  const games = CATALOG.map((g) => ({ ...g, itemsLeft: getStock(g.id) }));
-  return NextResponse.json({ games });
+  try {
+    const snap = await adminDb.collection("games").get();
+    const games = snap.docs
+      .map((d) => d.data() as Game)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    return NextResponse.json({ games });
+  } catch (err) {
+    console.error("[/api/games]", err);
+    return NextResponse.json(
+      { error: "Could not load games. Is Firebase configured and seeded?" },
+      { status: 500 }
+    );
+  }
 }

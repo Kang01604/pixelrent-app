@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Header, Footer, PillButton, CalendarIcon, Toast, PageId, todayIso, displayDate, UserProfile, AppNotification, formatAddress, authInputClass, AuthField } from "./shared";
 import { CartItem, CoverSlot, RentConfigModal, cartRowKey } from "./BrowseGames";
+import { auth } from "../../lib/firebase";
 
 /* ============================================================
    PixelRent — My Cart
@@ -546,10 +547,21 @@ export default function CartPage({
     }
 
     setPayment({ stage: "processing" });
+    // Prove who's ordering — the API verifies this token server-side.
+    const idToken = await auth.currentUser?.getIdToken().catch(() => null);
+    if (!idToken) {
+      setPayment(null);
+      setToast("Session expired. Please sign in again.");
+      onAuth("login");
+      return;
+    }
     const [res] = await Promise.all([
       fetch("/api/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           items: selectedItems.map((c) => ({ gameId: c.game.id, qty: c.qty, end: c.end })),
           paymentMethod,

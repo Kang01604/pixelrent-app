@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// ============================================================
+// PixelRent — Firestore Security Rules
+//
+// The API routes use the Admin SDK, which BYPASSES these rules.
+// So stock decrements and order writes happen server-side and
+// are always allowed. These rules govern the CLIENT SDK only
+// (auth profile reads/writes, reading games, reading own orders).
+// ============================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A user may read/write only their own profile document.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Catalog is public to read. Clients can NEVER write stock —
+    // only the server (Admin SDK) changes it.
+    match /games/{gameId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // A user may read their own orders. Orders are created only
+    // by the server (Admin SDK), never by the client.
+    match /orders/{orderId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+  }
+}
