@@ -23,6 +23,7 @@ export type Game = {
   itemsLeft: number; // starting stock — live stock lives in Firestore (games collection)
   sales: number;
   addedAt: number;
+  reviewCount?: number; // number of seeded reviews; rating is their average
 };
 
 const steamCover = (appId: number) =>

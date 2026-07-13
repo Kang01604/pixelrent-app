@@ -83,20 +83,12 @@ const SECTIONS: Section[] = [
   },
 ];
 
-type Review = {
-  id: number;
+export type Review = {
   user: string;
   stars: number;
   line1: string;
   line2: string;
 };
-const REVIEWS: Review[] = Array.from({ length: 9 }, (_, i) => ({
-  id: i + 1,
-  user: "Gamer1234",
-  stars: 5,
-  line1: "Lorem ipsum dolor sit amet, consectetur",
-  line2: "Supporting line text lorem ipsum dolor sit amet, consectetur.",
-}));
 
 type SortMode = "latest" | "topSales" | "priceAsc" | "priceDesc";
 
@@ -285,7 +277,7 @@ function GameCard({
         </span>
         <span className="flex items-center gap-1.5 font-condensed text-lg font-light text-white">
           <StarIcon className="h-5 w-5" />
-          {game.rating}
+          {game.rating.toFixed(1)}
         </span>
       </div>
     </button>
@@ -900,6 +892,25 @@ function GameInfoModal({
   const [configMode, setConfigMode] = useState<"cart" | "checkout" | null>(null);
   const [wishlisted, setWishlisted] = useState(false);
 
+  /* Reviews are seeded in Firestore and served by /api/reviews.
+     Load them when this game's modal opens. */
+  const [reviews, setReviews] = useState<Review[]>([]);
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/reviews?gameId=${encodeURIComponent(game.id)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (active && data?.reviews) setReviews(data.reviews as Review[]);
+      })
+      .catch(() => {
+        /* leave empty on failure */
+      });
+    return () => {
+      active = false;
+    };
+  }, [game.id]);
+  const reviewCount = game.reviewCount ?? reviews.length;
+
   /* Esc closes — but when the quantity popup is on top, Esc only
      closes that one (it has its own listener). */
   useEffect(() => {
@@ -1007,24 +1018,28 @@ function GameInfoModal({
                     Reviews
                   </h2>
                   <p className="mt-1 font-condensed text-base font-thin text-white/80">
-                    {REVIEWS.length * 3 - 2} Reviews
+                    {reviewCount} Reviews
                   </p>
                 </div>
                 <p className="flex items-center gap-3 font-condensed text-4xl font-light text-white sm:text-5xl">
                   <StarIcon className="h-8 w-8 sm:h-9 sm:w-9" />
-                  {game.rating}
+                  {game.rating.toFixed(1)}
                 </p>
               </div>
 
               <ul className="mt-4 max-h-[340px] flex-1 overflow-y-auto pr-1 lg:max-h-none lg:min-h-0">
-                {REVIEWS.map((review) => (
-                  <ReviewItem
-                    key={review.id}
-                    review={review}
-                    loggedIn={loggedIn}
-                    onRequireLogin={() => onAuth("login")}
-                  />
-                ))}
+                {reviews.length === 0 ? (
+                  <li className="px-4 py-3 text-sm text-white/70">Loading reviews…</li>
+                ) : (
+                  reviews.map((review, i) => (
+                    <ReviewItem
+                      key={i}
+                      review={review}
+                      loggedIn={loggedIn}
+                      onRequireLogin={() => onAuth("login")}
+                    />
+                  ))
+                )}
               </ul>
             </section>
 
