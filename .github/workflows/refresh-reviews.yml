@@ -1,0 +1,29 @@
+name: Refresh RAWG reviews
+
+# Runs once a day to pull fresh ratings + reviews from RAWG into
+# Firestore. Also runnable on demand from the Actions tab.
+on:
+  schedule:
+    - cron: "0 18 * * *" # 18:00 UTC daily (~2 AM Manila)
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Refresh reviews from RAWG
+        env:
+          RAWG_API_KEY: ${{ secrets.RAWG_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+        run: npx tsx scripts/refresh-reviews.ts
