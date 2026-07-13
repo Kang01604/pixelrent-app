@@ -1,0 +1,132 @@
+diff --git a/app/api/auth/check-availability/route.ts b/app/api/auth/check-availability/route.ts
+new file mode 100644
+index 0000000..ad97f4c
+--- /dev/null
++++ b/app/api/auth/check-availability/route.ts
+@@ -0,0 +1,46 @@
++import { NextResponse } from "next/server";
++import { adminAuth, adminDb } from "../../../../lib/firebaseAdmin";
++
++export const dynamic = "force-dynamic";
++export const runtime = "nodejs";
++
++/** GET /api/auth/check-availability?email=...&username=...
++    Reports whether an email and/or username is already taken, so the
++    register form can block duplicates on step 1 (before the user fills
++    out step 2). Email is checked via the Admin SDK (works even with
++    Firebase's email-enumeration protection); username is checked
++    against the `users` profile collection. Returns
++    { emailTaken, usernameTaken }. */
++export async function GET(req: Request) {
++  const { searchParams } = new URL(req.url);
++  const email = (searchParams.get("email") ?? "").trim().toLowerCase();
++  const username = (searchParams.get("username") ?? "").trim();
++
++  let emailTaken = false;
++  let usernameTaken = false;
++
++  try {
++    if (email) {
++      try {
++        await adminAuth.getUserByEmail(email);
++        emailTaken = true;
++      } catch (err) {
++        if ((err as { code?: string })?.code !== "auth/user-not-found") throw err;
++      }
++    }
++
++    if (username) {
++      const snap = await adminDb
++        .collection("users")
++        .where("username", "==", username)
++        .limit(1)
++        .get();
++      usernameTaken = !snap.empty;
++    }
++
++    return NextResponse.json({ emailTaken, usernameTaken });
++  } catch (err) {
++    console.error("[/api/auth/check-availability]", err);
++    return NextResponse.json({ error: "Check failed." }, { status: 500 });
++  }
++}
+diff --git a/app/api/auth/check-email/route.ts b/app/api/auth/check-email/route.ts
+deleted file mode 100644
+index 32a002c..0000000
+--- a/app/api/auth/check-email/route.ts
++++ /dev/null
+@@ -1,27 +0,0 @@
+-import { NextResponse } from "next/server";
+-import { adminAuth } from "../../../../lib/firebaseAdmin";
+-
+-export const dynamic = "force-dynamic";
+-export const runtime = "nodejs";
+-
+-/** GET /api/auth/check-email?email=... — is this email already registered?
+-    Uses the Admin SDK, so it works even with Firebase's email-enumeration
+-    protection enabled. Returns { exists: boolean }. */
+-export async function GET(req: Request) {
+-  const { searchParams } = new URL(req.url);
+-  const email = (searchParams.get("email") ?? "").trim().toLowerCase();
+-  if (!email) {
+-    return NextResponse.json({ error: "Missing email." }, { status: 400 });
+-  }
+-
+-  try {
+-    await adminAuth.getUserByEmail(email);
+-    return NextResponse.json({ exists: true });
+-  } catch (err) {
+-    if ((err as { code?: string })?.code === "auth/user-not-found") {
+-      return NextResponse.json({ exists: false });
+-    }
+-    console.error("[/api/auth/check-email]", err);
+-    return NextResponse.json({ error: "Check failed." }, { status: 500 });
+-  }
+-}
+diff --git a/components/pixelrent/shared.tsx b/components/pixelrent/shared.tsx
+index aa53f8e..c143b4e 100644
+--- a/components/pixelrent/shared.tsx
++++ b/components/pixelrent/shared.tsx
+@@ -1117,9 +1117,9 @@ export function AuthModal({
+   }, [onClose]);
+ 
+   /* Step 1 -> Step 2. Fields must be properly filled (valid email
+-     format, username 3–16 chars, password ≥ 8), AND the email must
+-     not already be registered — otherwise the "email already in use"
+-     error would only surface after the user fills out all of step 2. */
++     format, username 3–16 chars, password ≥ 8), AND the email and
++     username must not already be taken — otherwise a duplicate would
++     only surface after the user fills out all of step 2. */
+   const continueStep = async () => {
+     if (busy) return;
+     const e: Record<string, string> = {};
+@@ -1132,21 +1132,24 @@ export function AuthModal({
+     setError("");
+     if (Object.keys(e).length > 0) return;
+ 
+-    // Block duplicate emails here, before showing step 2.
++    // Block duplicate email/username here, before showing step 2.
+     setBusy(true);
+     try {
+       const res = await fetch(
+-        `/api/auth/check-email?email=${encodeURIComponent(email.trim())}`,
++        `/api/auth/check-availability?email=${encodeURIComponent(email.trim())}&username=${encodeURIComponent(username.trim())}`,
+       );
+       const data = await res.json().catch(() => null);
+-      if (data?.exists) {
+-        setErrors({ email: "This email is already registered." });
++      const taken: Record<string, string> = {};
++      if (data?.emailTaken) taken.email = "This email is already registered.";
++      if (data?.usernameTaken) taken.username = "This username is already taken.";
++      if (Object.keys(taken).length > 0) {
++        setErrors(taken);
+         return;
+       }
+       setStep(2);
+     } catch {
+       // If the check itself fails, let them proceed — the final
+-      // Create Account step still catches duplicates as a fallback.
++      // Create Account step still catches a duplicate email as a fallback.
+       setStep(2);
+     } finally {
+       setBusy(false);

@@ -1117,9 +1117,9 @@ export function AuthModal({
   }, [onClose]);
 
   /* Step 1 -> Step 2. Fields must be properly filled (valid email
-     format, username 3–16 chars, password ≥ 8), AND the email must
-     not already be registered — otherwise the "email already in use"
-     error would only surface after the user fills out all of step 2. */
+     format, username 3–16 chars, password ≥ 8), AND the email and
+     username must not already be taken — otherwise a duplicate would
+     only surface after the user fills out all of step 2. */
   const continueStep = async () => {
     if (busy) return;
     const e: Record<string, string> = {};
@@ -1132,21 +1132,24 @@ export function AuthModal({
     setError("");
     if (Object.keys(e).length > 0) return;
 
-    // Block duplicate emails here, before showing step 2.
+    // Block duplicate email/username here, before showing step 2.
     setBusy(true);
     try {
       const res = await fetch(
-        `/api/auth/check-email?email=${encodeURIComponent(email.trim())}`,
+        `/api/auth/check-availability?email=${encodeURIComponent(email.trim())}&username=${encodeURIComponent(username.trim())}`,
       );
       const data = await res.json().catch(() => null);
-      if (data?.exists) {
-        setErrors({ email: "This email is already registered." });
+      const taken: Record<string, string> = {};
+      if (data?.emailTaken) taken.email = "This email is already registered.";
+      if (data?.usernameTaken) taken.username = "This username is already taken.";
+      if (Object.keys(taken).length > 0) {
+        setErrors(taken);
         return;
       }
       setStep(2);
     } catch {
       // If the check itself fails, let them proceed — the final
-      // Create Account step still catches duplicates as a fallback.
+      // Create Account step still catches a duplicate email as a fallback.
       setStep(2);
     } finally {
       setBusy(false);
