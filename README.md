@@ -39,15 +39,6 @@ it needs internet on first build).
 | `app/api/*` | games, checkout, auth/login, auth/register |
 | `components/pixelrent/` | The whole UI (client components) |
 
-## Cover art
-
-Steam-available titles hotlink Steam's public CDN
-(`cdn.cloudflare.steamstatic.com`). Titles that aren't on Steam — Gran
-Turismo 7, Minecraft, and the six Nintendo Switch games — have
-`coverUrl: ""` in `lib/catalog.ts` (`COVERS` map at the top): paste any
-image URL there and it renders. Any broken URL gracefully falls back to the
-styled placeholder tile.
-
 ## Notes
 
 - Cart persists in `localStorage`.
