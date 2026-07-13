@@ -1,16 +1,13 @@
 /* ============================================================
-   PixelRent — RAWG review refresh (run daily, NOT at request time).
+   PixelRent — RAWG rating refresh (run daily, NOT at request time).
 
-   Fetches real ratings + written reviews from RAWG ONCE per run,
-   copies them into Firestore, and logs a summary. The app only ever
-   reads Firestore, so visitors cost zero RAWG requests — this is the
-   only thing that spends the 20,000/month quota (~24 calls per run).
+   Fetches each game's real average rating + rating distribution
+   from RAWG ONCE per run and copies them onto the game docs in
+   Firestore. The app reads Firestore, so visitors cost zero RAWG
+   requests — only this job spends quota (~24 calls per run).
 
-   For each game:
-     1. Official API → real slug + rating (out of 5).   [1 request]
-     2. Internal endpoint → written reviews (text).      [0 quota — no key]
-     3. If fewer than MIN_REVIEWS have text, top up with generated ones.
-     4. Write game.rating + game.reviewCount, replace its reviews.
+   No login needed: the rating distribution comes from the official
+   API with the key.
 
    Run manually:  npx tsx scripts/refresh-reviews.ts
    Runs daily via .github/workflows/refresh-reviews.yml
@@ -22,10 +19,8 @@ config({ path: ".env.local" });
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { CATALOG } from "../lib/catalog";
-import { resolveGame, fetchReviews, sleep, type RawgReview } from "../lib/rawg";
-import { generateReviews, averageStars } from "../lib/reviews-data";
+import { resolveGame, sleep } from "../lib/rawg";
 
-const MIN_REVIEWS = 8; // ensure every game shows a decent list
 const REQUEST_GAP_MS = 350; // be polite to RAWG between calls
 
 const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -33,11 +28,13 @@ const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
 if (!projectId || !clientEmail || !privateKey) {
-  console.error("Missing FIREBASE_* env vars (project id / client email / private key).");
+  console.error(
+    "Missing FIREBASE_* env vars (project id / client email / private key).",
+  );
   process.exit(1);
 }
 if (!process.env.RAWG_API_KEY) {
-  console.warn("⚠  No RAWG_API_KEY set — will fall back to generated reviews for every game.");
+  console.warn("⚠  No RAWG_API_KEY set — ratings will be left unchanged.");
 }
 
 if (!getApps().length) {
@@ -45,65 +42,42 @@ if (!getApps().length) {
 }
 const db = getFirestore();
 
-async function clearReviews(gameId: string) {
-  const existing = await db.collection("games").doc(gameId).collection("reviews").get();
-  if (existing.empty) return;
-  const batch = db.batch();
-  existing.docs.forEach((d) => batch.delete(d.ref));
-  await batch.commit();
-}
-
 async function refresh() {
   let rawgRequests = 0;
-  let totalReal = 0;
-  let totalReviews = 0;
+  let matched = 0;
 
   for (const game of CATALOG) {
-    // 1. Real slug + rating from the official API.
-    const resolved = await resolveGame(game.name);
+    const r = await resolveGame(game.name);
     rawgRequests++;
     await sleep(REQUEST_GAP_MS);
 
-    // 2. Real written reviews from the internal endpoint (no quota cost).
-    let real: RawgReview[] = [];
-    if (resolved) {
-      real = await fetchReviews(resolved.slug);
-      await sleep(REQUEST_GAP_MS);
+    if (!r) {
+      console.log(`${game.name.padEnd(38)} → (no RAWG match — left unchanged)`);
+      continue;
     }
+    matched++;
 
-    // 3. Top up with generated reviews if RAWG had too few written ones.
-    const reviews: RawgReview[] = [...real];
-    if (reviews.length < MIN_REVIEWS) {
-      const filler = generateReviews().slice(0, MIN_REVIEWS - reviews.length);
-      reviews.push(...filler);
-    }
+    const rating = Math.round(r.rating * 10) / 10;
+    await db
+      .collection("games")
+      .doc(game.id)
+      .set(
+        { rating, reviewCount: r.count, ratingBreakdown: r.breakdown },
+        { merge: true },
+      );
 
-    // 4. Headline rating: RAWG's real average if we got one, else the
-    //    average of the reviews we ended up with.
-    const rating =
-      resolved && resolved.rating > 0
-        ? Math.round(resolved.rating * 10) / 10
-        : averageStars(reviews);
-
-    await clearReviews(game.id);
-    const batch = db.batch();
-    const gameRef = db.collection("games").doc(game.id);
-    batch.set(gameRef, { ...game, rating, reviewCount: reviews.length }, { merge: true });
-    reviews.forEach((r) => batch.set(gameRef.collection("reviews").doc(), r));
-    await batch.commit();
-
-    totalReal += real.length;
-    totalReviews += reviews.length;
+    const b = r.breakdown;
     console.log(
-      `${game.name.padEnd(38)} → ${resolved ? resolved.slug.padEnd(34) : "(no RAWG match)".padEnd(34)} ` +
-        `rating ${rating}  real:${real.length}  total:${reviews.length}`,
+      `${game.name.padEnd(38)} → ${r.slug.padEnd(34)} ${rating}  ` +
+        `(5:${b["5"]} 4:${b["4"]} 3:${b["3"]} 2:${b["2"]} 1:${b["1"]}, total ${r.count})`,
     );
   }
 
   console.log("————————————————————————————————————————");
-  console.log(`Done. ${CATALOG.length} games updated.`);
-  console.log(`RAWG API requests used this run: ${rawgRequests} (of 20,000/month).`);
-  console.log(`Real RAWG written reviews: ${totalReal}. Total reviews stored: ${totalReviews}.`);
+  console.log(`Done. ${matched}/${CATALOG.length} games matched on RAWG.`);
+  console.log(
+    `RAWG API requests used this run: ${rawgRequests} (of 20,000/month).`,
+  );
 }
 
 refresh()

@@ -530,32 +530,43 @@ function FilterPanel({
 
 /* ----------------------- Game info popup ----------------------- */
 
-function ReviewItem({ review }: { review: Review }) {
-  return (
-    <li className="flex gap-4 border-b border-white/15 px-4 py-3">
-      {/* avatar slot — intentionally blank */}
-      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/10 font-condensed text-lg text-white/60">
-        {review.user[0]}
-      </div>
+/** RAWG rating distribution — one bar per level (5 → 1). RAWG has no
+    level 2, so that row is always empty. Bars are scaled to the
+    largest count so the shape is easy to read. */
+function RatingBars({ breakdown }: { breakdown?: Record<string, number> }) {
+  const levels = [5, 4, 3, 2, 1];
+  const counts = levels.map((l) => breakdown?.[String(l)] ?? 0);
+  const max = Math.max(1, ...counts);
+  const hasData = counts.some((c) => c > 0);
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="flex-1 truncate text-lg text-white">{review.user}</p>
-          <span
-            className="flex text-[#f5c518]"
-            aria-label={`${review.stars} stars`}
-          >
-            {Array.from({ length: review.stars }, (_, i) => (
-              <StarIcon key={i} className="h-3.5 w-3.5" />
-            ))}
-          </span>
-        </div>
-        <p className="mt-1 truncate text-sm text-[#f2f2f2]/90">
-          {review.line1}
-        </p>
-        <p className="truncate text-sm text-[#f2f2f2]/70">{review.line2}</p>
-      </div>
-    </li>
+  return (
+    <div className="mt-6 flex flex-1 flex-col justify-center gap-3">
+      {!hasData && (
+        <p className="text-sm text-white/70">No ratings yet.</p>
+      )}
+      {hasData &&
+        levels.map((level, i) => {
+          const count = counts[i];
+          const pct = (count / max) * 100;
+          return (
+            <div key={level} className="flex items-center gap-3">
+              <span className="flex w-9 items-center gap-1 font-condensed text-lg text-white">
+                {level}
+                <StarIcon className="h-3.5 w-3.5" />
+              </span>
+              <div className="h-3.5 flex-1 overflow-hidden rounded-full bg-black/25">
+                <div
+                  className="h-full rounded-full bg-white/85 transition-[width] duration-500"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="w-14 text-right font-condensed text-sm tabular-nums text-white/70">
+                {count.toLocaleString()}
+              </span>
+            </div>
+          );
+        })}
+    </div>
   );
 }
 
@@ -854,24 +865,8 @@ function GameInfoModal({
 }) {
   const [configMode, setConfigMode] = useState<"cart" | "checkout" | null>(null);
 
-  /* Reviews are seeded in Firestore and served by /api/reviews.
-     Load them when this game's modal opens. */
-  const [reviews, setReviews] = useState<Review[]>([]);
-  useEffect(() => {
-    let active = true;
-    fetch(`/api/reviews?gameId=${encodeURIComponent(game.id)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (active && data?.reviews) setReviews(data.reviews as Review[]);
-      })
-      .catch(() => {
-        /* leave empty on failure */
-      });
-    return () => {
-      active = false;
-    };
-  }, [game.id]);
-  const reviewCount = game.reviewCount ?? reviews.length;
+  // Rating distribution + count come straight from the game doc (RAWG data).
+  const reviewCount = game.reviewCount ?? 0;
 
   /* Esc closes — but when the quantity popup is on top, Esc only
      closes that one (it has its own listener). */
@@ -980,7 +975,7 @@ function GameInfoModal({
                     Reviews
                   </h2>
                   <p className="mt-1 font-condensed text-base font-thin text-white/80">
-                    {reviewCount} Reviews
+                    {reviewCount.toLocaleString()} Ratings
                   </p>
                   <p className="mt-0.5 font-condensed text-xs font-thin uppercase tracking-wide text-white/50">
                     Powered by RAWG
@@ -992,15 +987,7 @@ function GameInfoModal({
                 </p>
               </div>
 
-              <ul className="mt-4 max-h-[340px] flex-1 overflow-y-auto pr-1 lg:max-h-none lg:min-h-0">
-                {reviews.length === 0 ? (
-                  <li className="px-4 py-3 text-sm text-white/70">Loading reviews…</li>
-                ) : (
-                  reviews.map((review, i) => (
-                    <ReviewItem key={i} review={review} />
-                  ))
-                )}
-              </ul>
+              <RatingBars breakdown={game.ratingBreakdown} />
             </section>
 
             <section

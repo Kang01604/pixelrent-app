@@ -23,7 +23,8 @@ export type Game = {
   itemsLeft: number; // starting stock — live stock lives in Firestore (games collection)
   sales: number;
   addedAt: number;
-  reviewCount?: number; // number of seeded reviews; rating is their average
+  reviewCount?: number; // total RAWG ratings; rating is their average
+  ratingBreakdown?: Record<string, number>; // { "5": n, "4": n, "3": n, "2": n, "1": n } from RAWG
 };
 
 const steamCover = (appId: number) =>
