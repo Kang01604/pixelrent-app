@@ -57,7 +57,8 @@ export default function PixelRentApp() {
         saved === "home" ||
         saved === "products" ||
         saved === "cart" ||
-        saved === "settings"
+        saved === "settings" ||
+        saved === "admin"
       ) {
         setPage(saved);
       }
@@ -300,8 +301,8 @@ export default function PixelRentApp() {
           {...headerProps}
         />
       )}
-      {page === "admin" && !isAdmin && (
-        /* Non-admin on the admin page (the effect will redirect home). */
+      {page === "admin" && !isAdmin && authReady && (
+        /* Confirmed non-admin on the admin page (the effect redirects home). */
         <Homepage onNavigate={setPage} cartCount={cartCount} {...headerProps} />
       )}
 

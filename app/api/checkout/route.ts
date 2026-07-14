@@ -97,6 +97,7 @@ export async function POST(req: Request) {
         total,
         paymentMethod,
         placedAt: new Date().toISOString(),
+        status: "pending",
       };
 
       tx.set(adminDb.collection("orders").doc(orderId), orderDoc);
