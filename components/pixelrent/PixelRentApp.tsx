@@ -225,11 +225,6 @@ export default function PixelRentApp() {
   const cartCount = cart.reduce((n, c) => n + c.qty, 0);
   const isAdmin = user?.role === "admin";
 
-  // TEMP DEBUG — remove after diagnosing admin access.
-  useEffect(() => {
-    console.log("[PIXELRENT DEBUG] authReady:", authReady, "| user:", user, "| role:", user?.role, "| isAdmin:", isAdmin);
-  }, [authReady, user, isAdmin]);
-
   /* Guard the admin page — bounce anyone who isn't an admin back home
      (covers logged-out users and non-admins who land on it directly). */
   useEffect(() => {

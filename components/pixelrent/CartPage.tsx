@@ -461,6 +461,7 @@ export default function CartPage({
   onAuth,
   loggedIn,
   onLogout,
+  isAdmin,
   highlightId,
   onClearHighlight,
   user,
@@ -479,6 +480,7 @@ export default function CartPage({
   onAuth: (mode: "login" | "register") => void;
   loggedIn: boolean;
   onLogout: () => void;
+  isAdmin?: boolean;
   highlightId: string | null;
   onClearHighlight: () => void;
   user: UserProfile | null;
@@ -607,6 +609,7 @@ export default function CartPage({
         onAuth={onAuth}
         loggedIn={loggedIn}
         onLogout={onLogout}
+        isAdmin={isAdmin}
         notifications={notifications}
         onNotificationsOpened={onNotificationsOpened}
         avatarUrl={avatarUrl}

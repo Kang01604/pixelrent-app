@@ -159,6 +159,7 @@ export default function Homepage({
   onAuth,
   loggedIn,
   onLogout,
+  isAdmin,
   notifications,
   onNotificationsOpened,
   avatarUrl,
@@ -168,6 +169,7 @@ export default function Homepage({
   onAuth: (mode: "login" | "register") => void;
   loggedIn: boolean;
   onLogout: () => void;
+  isAdmin?: boolean;
   notifications: AppNotification[];
   onNotificationsOpened: () => void;
   avatarUrl?: string;
@@ -193,6 +195,7 @@ export default function Homepage({
         onAuth={onAuth}
         loggedIn={loggedIn}
         onLogout={onLogout}
+        isAdmin={isAdmin}
         notifications={notifications}
         onNotificationsOpened={onNotificationsOpened}
         avatarUrl={avatarUrl}

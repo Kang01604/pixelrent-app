@@ -1235,6 +1235,7 @@ export default function BrowseGames({
   onAuth,
   loggedIn,
   onLogout,
+  isAdmin,
   onViewInCart,
   onCheckoutRequested,
   notifications,
@@ -1247,6 +1248,7 @@ export default function BrowseGames({
   onAuth: (mode: "login" | "register") => void;
   loggedIn: boolean;
   onLogout: () => void;
+  isAdmin?: boolean;
   onViewInCart: (id: string) => void;
   onCheckoutRequested: () => void;
   notifications: AppNotification[];
@@ -1306,6 +1308,7 @@ export default function BrowseGames({
         onAuth={onAuth}
         loggedIn={loggedIn}
         onLogout={onLogout}
+        isAdmin={isAdmin}
         notifications={notifications}
         onNotificationsOpened={onNotificationsOpened}
         avatarUrl={avatarUrl}

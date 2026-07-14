@@ -629,6 +629,7 @@ export default function SettingsPage({
         loggedIn
         onLogout={onLogout}
         onAuth={onAuth}
+        isAdmin={user.role === "admin"}
         notifications={notifications}
         onNotificationsOpened={onNotificationsOpened}
         avatarUrl={user.avatarUrl}
