@@ -74,22 +74,15 @@ export default function PixelRentApp() {
     }
   }, [page]);
 
-  /* Cart survives refreshes via localStorage (client-side only). */
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("pixelrent-cart");
-      if (raw) setCart(JSON.parse(raw));
-    } catch {
-      /* corrupted cart — start fresh */
+  /* Cart lives in Firestore per-user — it syncs across devices, is empty
+     when logged out, and requires login to add to. persistCart writes the
+     current cart onto the signed-in user's doc. */
+  const persistCart = (next: CartItem[]) => {
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      setDoc(doc(db, "users", uid), { cart: next }, { merge: true }).catch(() => {});
     }
-  }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem("pixelrent-cart", JSON.stringify(cart));
-    } catch {
-      /* storage full/blocked — cart stays in memory */
-    }
-  }, [cart]);
+  };
 
   /* Restore the signed-in user on refresh. Firebase persists the
      session; we re-hydrate the profile from Firestore. */
@@ -97,16 +90,21 @@ export default function PixelRentApp() {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser) {
         setUser(null);
+        setCart([]); // logged out = empty cart
         setAuthReady(true);
         return;
       }
       try {
         const snap = await getDoc(doc(db, "users", fbUser.uid));
         if (snap.exists()) {
-          const data = snap.data() as UserProfile & { notifications?: AppNotification[] };
-          // Keep notifications out of the profile object we hand around.
-          const { notifications: stored, ...profile } = data;
+          const data = snap.data() as UserProfile & {
+            notifications?: AppNotification[];
+            cart?: CartItem[];
+          };
+          // Keep notifications + cart out of the profile object we hand around.
+          const { notifications: stored, cart: storedCart, ...profile } = data;
           setUser(profile as UserProfile);
+          setCart(Array.isArray(storedCart) ? storedCart : []);
 
           const kept = pruneNotifications(Array.isArray(stored) ? stored : []);
           setNotifications(kept);
@@ -138,30 +136,42 @@ export default function PixelRentApp() {
     return next;
   };
 
-  const addToCart = (game: Game, ends: string[]) =>
-    setCart((prev) => mergeCopies(prev, game, ends));
+  const addToCart = (game: Game, ends: string[]) => {
+    if (!user) {
+      openAuth("login"); // must be logged in to add to cart
+      return;
+    }
+    const next = mergeCopies(cart, game, ends);
+    setCart(next);
+    persistCart(next);
+  };
 
-  const setQty = (key: string, qty: number) =>
-    setCart((prev) =>
-      prev.map((c) =>
-        cartRowKey(c) === key
-          ? { ...c, qty: Math.min(Math.max(1, qty), c.game.itemsLeft) }
-          : c
-      )
+  const setQty = (key: string, qty: number) => {
+    const next = cart.map((c) =>
+      cartRowKey(c) === key
+        ? { ...c, qty: Math.min(Math.max(1, qty), c.game.itemsLeft) }
+        : c,
     );
+    setCart(next);
+    persistCart(next);
+  };
 
   /* Re-configure a row's copies: the old row is removed and its copies
      are regrouped by end date — splitting or re-merging as needed. */
-  const updateRow = (key: string, ends: string[]) =>
-    setCart((prev) => {
-      const row = prev.find((c) => cartRowKey(c) === key);
-      if (!row) return prev;
-      const without = prev.filter((c) => cartRowKey(c) !== key);
-      return mergeCopies(without, row.game, ends);
-    });
+  const updateRow = (key: string, ends: string[]) => {
+    const row = cart.find((c) => cartRowKey(c) === key);
+    if (!row) return;
+    const without = cart.filter((c) => cartRowKey(c) !== key);
+    const next = mergeCopies(without, row.game, ends);
+    setCart(next);
+    persistCart(next);
+  };
 
-  const removeItems = (keys: string[]) =>
-    setCart((prev) => prev.filter((c) => !keys.includes(cartRowKey(c))));
+  const removeItems = (keys: string[]) => {
+    const next = cart.filter((c) => !keys.includes(cartRowKey(c)));
+    setCart(next);
+    persistCart(next);
+  };
 
   const openAuth = (mode: "login" | "register") => setAuthMode(mode);
   const logout = () => {
@@ -170,6 +180,7 @@ export default function PixelRentApp() {
     });
     setUser(null);
     setNotifications([]);
+    setCart([]);
   };
 
   /* Profile / address edits update the session immediately AND persist to
