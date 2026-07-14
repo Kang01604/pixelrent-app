@@ -530,42 +530,90 @@ function FilterPanel({
 
 /* ----------------------- Game info popup ----------------------- */
 
-/** RAWG rating distribution — one bar per level (5 → 1). RAWG has no
-    level 2, so that row is always empty. Bars are scaled to the
-    largest count so the shape is easy to read. */
-function RatingBars({ breakdown }: { breakdown?: Record<string, number> }) {
-  const levels = [5, 4, 3, 2, 1];
-  const counts = levels.map((l) => breakdown?.[String(l)] ?? 0);
-  const max = Math.max(1, ...counts);
-  const hasData = counts.some((c) => c > 0);
+/** RAWG rating breakdown: a general consensus line, one row per level
+    (Exceptional / Good / Meh / Boring — RAWG's 5/4/3/1), and a single
+    segmented bar at the bottom showing every level's share. No stars,
+    no scrolling. Uses the old review-row spacing. */
+function RatingBreakdown({
+  breakdown,
+  rating,
+  total,
+}: {
+  breakdown?: Record<string, number>;
+  rating: number;
+  total: number;
+}) {
+  const rows = [
+    { key: "5", label: "Exceptional", color: "rgba(255,255,255,0.92)" },
+    { key: "4", label: "Good", color: "rgba(255,255,255,0.64)" },
+    { key: "3", label: "Meh", color: "rgba(255,255,255,0.40)" },
+    { key: "1", label: "Boring", color: "rgba(255,255,255,0.22)" },
+  ];
+  const counts = rows.map((r) => breakdown?.[r.key] ?? 0);
+  const sum = counts.reduce((a, b) => a + b, 0);
+  const hasData = sum > 0;
+  const consensus = hasData
+    ? rows[counts.indexOf(Math.max(...counts))].label
+    : "No ratings yet";
 
   return (
-    <div className="mt-6 flex flex-1 flex-col justify-center gap-3">
-      {!hasData && (
-        <p className="text-sm text-white/70">No ratings yet.</p>
-      )}
-      {hasData &&
-        levels.map((level, i) => {
-          const count = counts[i];
-          const pct = (count / max) * 100;
-          return (
-            <div key={level} className="flex items-center gap-3">
-              <span className="flex w-9 items-center gap-1 font-condensed text-lg text-white">
-                {level}
-                <StarIcon className="h-3.5 w-3.5" />
-              </span>
-              <div className="h-3.5 flex-1 overflow-hidden rounded-full bg-black/25">
-                <div
-                  className="h-full rounded-full bg-white/85 transition-[width] duration-500"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <span className="w-14 text-right font-condensed text-sm tabular-nums text-white/70">
-                {count.toLocaleString()}
-              </span>
+    <div className="mt-4 flex flex-1 flex-col">
+      {/* General consensus */}
+      <div className="border-b border-white/15 px-4 py-3">
+        <p className="font-condensed text-3xl font-bold text-white">
+          {consensus}
+        </p>
+        <p className="mt-1 font-condensed text-sm text-white/70">
+          General consensus
+          {hasData &&
+            ` · ${rating.toFixed(1)} / 5 · ${total.toLocaleString()} ratings`}
+        </p>
+      </div>
+
+      {/* One row per level */}
+      {rows.map((r, i) => {
+        const count = counts[i];
+        const pct = sum ? Math.round((count / sum) * 100) : 0;
+        return (
+          <div
+            key={r.key}
+            className="flex items-center gap-4 border-b border-white/15 px-4 py-3"
+          >
+            <div
+              className="h-11 w-11 shrink-0 rounded-2xl"
+              style={{ backgroundColor: r.color }}
+              aria-hidden="true"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="font-condensed text-lg text-white">{r.label}</p>
+              <p className="mt-0.5 font-condensed text-sm text-white/70">
+                {pct}% of ratings
+              </p>
             </div>
-          );
-        })}
+            <p className="font-condensed text-2xl tabular-nums text-white">
+              {count.toLocaleString()}
+            </p>
+          </div>
+        );
+      })}
+
+      {/* Bottom: one segmented bar showing every level's share */}
+      <div className="mt-5 px-4">
+        <div className="flex h-4 w-full overflow-hidden rounded-full bg-black/25">
+          {hasData &&
+            rows.map((r, i) => {
+              const w = (counts[i] / sum) * 100;
+              if (w <= 0) return null;
+              return (
+                <div
+                  key={r.key}
+                  style={{ width: `${w}%`, backgroundColor: r.color }}
+                  title={`${r.label}: ${counts[i].toLocaleString()}`}
+                />
+              );
+            })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -863,7 +911,9 @@ function GameInfoModal({
   onAuth: (mode: "login" | "register") => void;
   onCheckoutRequested: () => void;
 }) {
-  const [configMode, setConfigMode] = useState<"cart" | "checkout" | null>(null);
+  const [configMode, setConfigMode] = useState<"cart" | "checkout" | null>(
+    null,
+  );
 
   // Rating distribution + count come straight from the game doc (RAWG data).
   const reviewCount = game.reviewCount ?? 0;
@@ -981,13 +1031,13 @@ function GameInfoModal({
                     Powered by RAWG
                   </p>
                 </div>
-                <p className="flex items-center gap-3 font-condensed text-4xl font-light text-white sm:text-5xl">
-                  <StarIcon className="h-8 w-8 sm:h-9 sm:w-9" />
-                  {game.rating.toFixed(1)}
-                </p>
               </div>
 
-              <RatingBars breakdown={game.ratingBreakdown} />
+              <RatingBreakdown
+                breakdown={game.ratingBreakdown}
+                rating={game.rating}
+                total={reviewCount}
+              />
             </section>
 
             <section
@@ -1019,7 +1069,9 @@ function GameInfoModal({
                   variant="gradient"
                   size="sm"
                   className="flex-1"
-                  onClick={() => (inCart ? onGoToCart() : setConfigMode("cart"))}
+                  onClick={() =>
+                    inCart ? onGoToCart() : setConfigMode("cart")
+                  }
                 >
                   <span className="flex items-center justify-center gap-2">
                     <CartIcon className="h-5 w-5" />
@@ -1311,7 +1363,16 @@ export default function BrowseGames({
                 className="gradient-animated shrink-0 rounded-[10px] bg-gradient-to-r from-[#781ea2] via-[#2dcabd] to-[#781ea2]
                            p-2 text-white outline-none transition hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[#15f5ea] active:translate-y-0 active:scale-95"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
                   <path d="M5 12h14" />
                   <path d="m12 5 7 7-7 7" />
                 </svg>
