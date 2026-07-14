@@ -557,7 +557,7 @@ function RatingBreakdown({
     : "No ratings yet";
 
   return (
-    <div className="mt-4 flex flex-1 flex-col">
+    <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
       {/* General consensus */}
       <div className="border-b border-white/15 px-4 py-3">
         <p className="font-condensed text-3xl font-bold text-white">
@@ -1014,7 +1014,7 @@ function GameInfoModal({
           <div className="flex flex-col gap-5 lg:min-h-0 lg:gap-7">
             <section
               aria-label="Reviews"
-              className="flex min-h-0 flex-1 flex-col rounded-[36px] p-6 shadow-[-14px_20px_38px_rgba(24,9,31,0.32)] sm:p-8"
+              className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[36px] p-6 shadow-[-14px_20px_38px_rgba(24,9,31,0.32)] sm:p-8"
               style={{
                 backgroundImage: `linear-gradient(135deg, ${game.gradient.from}, ${game.gradient.to})`,
               }}
