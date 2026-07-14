@@ -72,6 +72,28 @@ export default function AdminUsers() {
     }
   };
 
+  const resetPassword = async (u: AdminUser) => {
+    const pw = window.prompt(`Set a new password for ${u.username} (min 8 characters):`);
+    if (pw === null) return; // cancelled
+    if (pw.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    setBusyId(u.uid);
+    setError("");
+    try {
+      await adminFetch(`/api/admin/users/${u.uid}/password`, {
+        method: "POST",
+        body: JSON.stringify({ password: pw }),
+      });
+      window.alert(`Password updated for ${u.username}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to reset password.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const toggleDisabled = async (u: AdminUser) => {
     if (!confirm(u.disabled ? `Restore ${u.username}?` : `Disable ${u.username}? They won't be able to log in, and the account is permanently deleted after 30 days.`)) return;
     setBusyId(u.uid);
@@ -159,6 +181,14 @@ export default function AdminUsers() {
                   <td className="px-3 text-right">
                     <div className="flex flex-wrap justify-end gap-2">
                       <button type="button" onClick={() => setEditing(u)} className={actionBtn}>Edit</button>
+                      <button
+                        type="button"
+                        disabled={busyId === u.uid}
+                        onClick={() => resetPassword(u)}
+                        className={actionBtn}
+                      >
+                        Reset password
+                      </button>
                       <button
                         type="button"
                         disabled={busyId === u.uid}
