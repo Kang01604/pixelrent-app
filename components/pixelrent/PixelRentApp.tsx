@@ -16,6 +16,22 @@ import { auth, db } from "../../lib/firebase";
 const useBrowserLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
+// Notifications auto-expire after 30 days.
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+function pruneNotifications(list: AppNotification[]): AppNotification[] {
+  const now = Date.now();
+  return list.filter(
+    (n) => !n.createdAt || now - new Date(n.createdAt).getTime() < THIRTY_DAYS_MS,
+  );
+}
+
+function persistNotifications(list: AppNotification[]) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  setDoc(doc(db, "users", uid), { notifications: list }, { merge: true }).catch(() => {});
+}
+
 export default function PixelRentApp() {
   const [page, setPage] = useState<PageId>("home");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -84,7 +100,21 @@ export default function PixelRentApp() {
       }
       try {
         const snap = await getDoc(doc(db, "users", fbUser.uid));
-        if (snap.exists()) setUser(snap.data() as UserProfile);
+        if (snap.exists()) {
+          const data = snap.data() as UserProfile & { notifications?: AppNotification[] };
+          // Keep notifications out of the profile object we hand around.
+          const { notifications: stored, ...profile } = data;
+          setUser(profile as UserProfile);
+
+          const kept = pruneNotifications(Array.isArray(stored) ? stored : []);
+          setNotifications(kept);
+          // If the 30-day prune dropped anything, save the trimmed list back.
+          if (Array.isArray(stored) && kept.length !== stored.length) {
+            setDoc(doc(db, "users", fbUser.uid), { notifications: kept }, { merge: true }).catch(
+              () => {},
+            );
+          }
+        }
       } catch {
         /* offline / rules — leave user as-is */
       } finally {
@@ -137,6 +167,7 @@ export default function PixelRentApp() {
       /* ignore — local state is cleared regardless */
     });
     setUser(null);
+    setNotifications([]);
   };
 
   /* Profile / address edits update the session immediately AND persist to
@@ -164,23 +195,31 @@ export default function PixelRentApp() {
 
   const clearCheckoutRequest = () => setCheckoutRequested(false);
 
-  /* Placed order -> notification with the server-issued order ID. */
+  /* Placed order -> notification with the server-issued order ID.
+     Notifications are stored per-user in Firestore, survive refreshes,
+     and auto-expire after 30 days. */
   const orderPlaced = (orderId: string, lines: string[], total: number) => {
-    setNotifications((prev) => [
+    const next = pruneNotifications([
       {
         id: `n-${Date.now()}`,
         orderId,
         lines,
         total,
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        createdAt: new Date().toISOString(),
         read: false,
       },
-      ...prev,
+      ...notifications,
     ]);
+    setNotifications(next);
+    persistNotifications(next);
   };
 
-  const markNotificationsRead = () =>
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  const markNotificationsRead = () => {
+    const next = notifications.map((n) => ({ ...n, read: true }));
+    setNotifications(next);
+    persistNotifications(next);
+  };
 
   const cartCount = cart.reduce((n, c) => n + c.qty, 0);
 

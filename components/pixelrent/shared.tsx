@@ -56,6 +56,7 @@ export type AppNotification = {
   lines: string[];
   total: number;
   time: string;
+  createdAt: string; // ISO timestamp — used for 30-day auto-expiry
   read: boolean;
 };
 
