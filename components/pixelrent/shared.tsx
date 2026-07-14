@@ -13,7 +13,7 @@ import { auth, db } from "../../lib/firebase";
    Used by Homepage.tsx and BrowseGames.tsx.
    ============================================================ */
 
-export type PageId = "home" | "products" | "cart" | "settings";
+export type PageId = "home" | "products" | "cart" | "settings" | "admin";
 
 type NavItem = { id: PageId; label: string };
 export const NAV_ITEMS: NavItem[] = [
@@ -48,6 +48,7 @@ export type UserProfile = {
   addresses: Address[];
   defaultAddressId: string | null;
   avatarUrl?: string; // data-URL from the profile picture upload
+  role?: string; // "admin" unlocks the admin dashboard; absent = normal user
 };
 
 export type AppNotification = {
@@ -488,14 +489,18 @@ function NotificationMenu({
   );
 }
 
-/** Avatar button + dropdown: Settings (opens the account page) and Logout. */
+/** Avatar button + dropdown: Admin (admins only), Settings, and Logout. */
 function ProfileMenu({
   onLogout,
   onSettings,
+  onAdmin,
+  isAdmin = false,
   avatarUrl,
 }: {
   onLogout?: () => void;
   onSettings?: () => void;
+  onAdmin?: () => void;
+  isAdmin?: boolean;
   avatarUrl?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -536,6 +541,34 @@ function ProfileMenu({
           className="animate-slideUp absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-xl
                      border border-white/10 bg-[#18091f]/95 py-1.5 shadow-xl shadow-black/50 backdrop-blur"
         >
+          {isAdmin && (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onAdmin?.();
+                }}
+                className={`${itemClass} text-[#15f5ea] hover:bg-[#15f5ea]/15`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                Admin
+              </button>
+              <div className="mx-3 my-1 h-px bg-white/10" aria-hidden="true" />
+            </>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -599,6 +632,7 @@ export function Header({
   loggedIn = false,
   authReady = true,
   onLogout,
+  isAdmin = false,
   notifications,
   onNotificationsOpened,
   avatarUrl,
@@ -610,6 +644,7 @@ export function Header({
   loggedIn?: boolean;
   authReady?: boolean;
   onLogout?: () => void;
+  isAdmin?: boolean;
   notifications?: AppNotification[];
   onNotificationsOpened?: () => void;
   avatarUrl?: string;
@@ -674,6 +709,8 @@ export function Header({
             <ProfileMenu
               onLogout={onLogout}
               onSettings={() => onNavigate("settings")}
+              onAdmin={() => onNavigate("admin")}
+              isAdmin={isAdmin}
               avatarUrl={avatarUrl}
             />
           ) : (

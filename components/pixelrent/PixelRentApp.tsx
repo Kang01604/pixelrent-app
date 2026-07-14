@@ -5,6 +5,7 @@ import Homepage from "./Homepage";
 import BrowseGames, { Game, CartItem, cartRowKey } from "./BrowseGames";
 import CartPage from "./CartPage";
 import SettingsPage from "./SettingsPage";
+import AdminDashboard from "./AdminDashboard";
 import { AuthModal, PageId, UserProfile, AppNotification } from "./shared";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -222,12 +223,22 @@ export default function PixelRentApp() {
   };
 
   const cartCount = cart.reduce((n, c) => n + c.qty, 0);
+  const isAdmin = user?.role === "admin";
+
+  /* Guard the admin page — bounce anyone who isn't an admin back home
+     (covers logged-out users and non-admins who land on it directly). */
+  useEffect(() => {
+    if (page === "admin" && authReady && user?.role !== "admin") {
+      setPage("home");
+    }
+  }, [page, authReady, user]);
 
   const headerProps = {
     onAuth: openAuth,
     loggedIn,
     authReady,
     onLogout: logout,
+    isAdmin,
     notifications,
     onNotificationsOpened: markNotificationsRead,
     avatarUrl: user?.avatarUrl,
@@ -278,6 +289,19 @@ export default function PixelRentApp() {
       )}
       {page === "settings" && !user && (
         /* Not logged in but landed on settings (e.g. after deletion) */
+        <Homepage onNavigate={setPage} cartCount={cartCount} {...headerProps} />
+      )}
+
+      {page === "admin" && isAdmin && user && (
+        <AdminDashboard
+          onNavigate={setPage}
+          cartCount={cartCount}
+          user={user}
+          {...headerProps}
+        />
+      )}
+      {page === "admin" && !isAdmin && (
+        /* Non-admin on the admin page (the effect will redirect home). */
         <Homepage onNavigate={setPage} cartCount={cartCount} {...headerProps} />
       )}
 

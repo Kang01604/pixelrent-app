@@ -25,6 +25,7 @@ export type Game = {
   addedAt: number;
   reviewCount?: number; // total RAWG ratings; rating is their average
   ratingBreakdown?: Record<string, number>; // { "5": n, "4": n, "3": n, "2": n, "1": n } from RAWG
+  archived?: boolean; // hidden from the storefront (admin-archived) but kept for order history
 };
 
 const steamCover = (appId: number) =>

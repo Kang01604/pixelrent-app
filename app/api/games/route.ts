@@ -13,6 +13,7 @@ export async function GET() {
     const snap = await adminDb.collection("games").get();
     const games = snap.docs
       .map((d) => d.data() as Game)
+      .filter((g) => !g.archived) // archived games are hidden from shoppers
       .sort((a, b) => a.id.localeCompare(b.id));
     return NextResponse.json({ games });
   } catch (err) {
