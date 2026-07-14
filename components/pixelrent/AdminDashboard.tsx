@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AdminStock from "./AdminStock";
 import {
   Header,
   Footer,
@@ -84,15 +85,20 @@ export default function AdminDashboard({
         </div>
 
         {/* Panel */}
-        <div className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-8 shadow-[-14px_20px_38px_rgba(24,9,31,0.32)]">
-          <h2 className="font-condensed text-2xl font-bold text-white">
-            {TABS.find((t) => t.id === tab)?.label}
-          </h2>
-          <p className="mt-2 max-w-xl font-condensed text-white/60">
-            This section is coming in the next update. The dashboard is wired up
-            and your admin access works — {tab} management will appear here.
-          </p>
-        </div>
+        {tab === "stock" ? (
+          <div className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 shadow-[-14px_20px_38px_rgba(24,9,31,0.32)] sm:p-8">
+            <AdminStock />
+          </div>
+        ) : (
+          <div className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-8 shadow-[-14px_20px_38px_rgba(24,9,31,0.32)]">
+            <h2 className="font-condensed text-2xl font-bold text-white">
+              {TABS.find((t) => t.id === tab)?.label}
+            </h2>
+            <p className="mt-2 max-w-xl font-condensed text-white/60">
+              This section is coming in the next update.
+            </p>
+          </div>
+        )}
       </main>
 
       <Footer />
