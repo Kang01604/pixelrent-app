@@ -39,20 +39,23 @@ const statusCls: Record<string, string> = {
   cancelled: "bg-red-400/20 text-red-200",
 };
 
+// Survives tab remounts so re-opening Orders is instant.
+let cachedOrders: AdminOrder[] | null = null;
+
 export default function AdminOrders() {
-  const [orders, setOrders] = useState<AdminOrder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<AdminOrder[]>(cachedOrders ?? []);
+  const [loading, setLoading] = useState(cachedOrders === null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = async () => {
-    setLoading(true);
     setError("");
     try {
       const data = await adminFetch("/api/admin/orders");
       setOrders(data.orders ?? []);
+      cachedOrders = data.orders ?? [];
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load orders.");
     } finally {
@@ -72,7 +75,11 @@ export default function AdminOrders() {
         method: "PATCH",
         body: JSON.stringify({ status }),
       });
-      setOrders((os) => os.map((o) => (o.orderId === orderId ? { ...o, status } : o)));
+      setOrders((os) => {
+        const next = os.map((o) => (o.orderId === orderId ? { ...o, status } : o));
+        cachedOrders = next;
+        return next;
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed.");
     } finally {

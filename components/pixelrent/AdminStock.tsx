@@ -31,9 +31,12 @@ const emptyForm = {
   description: "",
 };
 
+// Survives tab remounts within the session, so re-opening Stock is instant.
+let cachedGames: Game[] | null = null;
+
 export default function AdminStock() {
-  const [games, setGames] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [games, setGames] = useState<Game[]>(cachedGames ?? []);
+  const [loading, setLoading] = useState(cachedGames === null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -44,11 +47,11 @@ export default function AdminStock() {
   const [adding, setAdding] = useState(false);
 
   const load = async () => {
-    setLoading(true);
     setError("");
     try {
       const data = await adminFetch("/api/admin/games");
       setGames(data.games ?? []);
+      cachedGames = data.games ?? [];
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load games.");
     } finally {
@@ -68,7 +71,11 @@ export default function AdminStock() {
         method: "PATCH",
         body: JSON.stringify(body),
       });
-      setGames((gs) => gs.map((g) => (g.id === id ? { ...g, ...body } : g)));
+      setGames((gs) => {
+        const next = gs.map((g) => (g.id === id ? { ...g, ...body } : g));
+        cachedGames = next;
+        return next;
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed.");
     } finally {
@@ -89,7 +96,11 @@ export default function AdminStock() {
           itemsLeft: Number(form.itemsLeft),
         }),
       });
-      setGames((gs) => [data.game as Game, ...gs]);
+      setGames((gs) => {
+        const next = [data.game as Game, ...gs];
+        cachedGames = next;
+        return next;
+      });
       setForm(emptyForm);
       setShowAdd(false);
     } catch (e) {

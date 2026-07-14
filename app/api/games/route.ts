@@ -15,7 +15,14 @@ export async function GET() {
       .map((d) => d.data() as Game)
       .filter((g) => !g.archived) // archived games are hidden from shoppers
       .sort((a, b) => a.id.localeCompare(b.id));
-    return NextResponse.json({ games });
+    return NextResponse.json(
+      { games },
+      {
+        // Edge-cache for 60s (stock changes show within a minute); checkout
+        // still reads live stock in a transaction, so no overselling.
+        headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
+      },
+    );
   } catch (err) {
     console.error("[/api/games]", err);
     return NextResponse.json(

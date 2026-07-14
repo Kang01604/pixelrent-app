@@ -32,9 +32,12 @@ type AdminUser = {
   addresses?: unknown[];
 };
 
+// Survives tab remounts so re-opening Users is instant.
+let cachedUsers: AdminUser[] | null = null;
+
 export default function AdminUsers() {
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<AdminUser[]>(cachedUsers ?? []);
+  const [loading, setLoading] = useState(cachedUsers === null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [showDisabled, setShowDisabled] = useState(false);
@@ -42,11 +45,11 @@ export default function AdminUsers() {
   const [editing, setEditing] = useState<AdminUser | null>(null);
 
   const load = async () => {
-    setLoading(true);
     setError("");
     try {
       const data = await adminFetch("/api/admin/users");
       setUsers(data.users ?? []);
+      cachedUsers = data.users ?? [];
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load users.");
     } finally {
@@ -64,7 +67,11 @@ export default function AdminUsers() {
     setError("");
     try {
       await adminFetch(`/api/admin/users/${uid}`, { method: "PATCH", body: JSON.stringify(body) });
-      setUsers((us) => us.map((u) => (u.uid === uid ? { ...u, ...body } : u)));
+      setUsers((us) => {
+        const next = us.map((u) => (u.uid === uid ? { ...u, ...body } : u));
+        cachedUsers = next;
+        return next;
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed.");
     } finally {
@@ -103,7 +110,11 @@ export default function AdminUsers() {
         method: "POST",
         body: JSON.stringify({ disabled: !u.disabled }),
       });
-      setUsers((us) => us.map((x) => (x.uid === u.uid ? { ...x, disabled: !u.disabled } : x)));
+      setUsers((us) => {
+        const next = us.map((x) => (x.uid === u.uid ? { ...x, disabled: !u.disabled } : x));
+        cachedUsers = next;
+        return next;
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed.");
     } finally {

@@ -12,18 +12,13 @@ export async function GET(req: Request) {
     const snap = await adminDb.collection("orders").get();
     const orders = snap.docs.map((d) => d.data());
 
-    // Attach a light customer label for each order.
-    const uids = [...new Set(orders.map((o) => (o as { uid?: string }).uid).filter(Boolean))] as string[];
+    // One read for all users, then a lookup map (was one read per order).
+    const usersSnap = await adminDb.collection("users").get();
     const userMap: Record<string, { username?: string; email?: string }> = {};
-    await Promise.all(
-      uids.map(async (uid) => {
-        const u = await adminDb.collection("users").doc(uid).get();
-        if (u.exists) {
-          const d = u.data() as { username?: string; email?: string };
-          userMap[uid] = { username: d.username, email: d.email };
-        }
-      }),
-    );
+    usersSnap.docs.forEach((u) => {
+      const d = u.data() as { username?: string; email?: string };
+      userMap[u.id] = { username: d.username, email: d.email };
+    });
 
     const withCustomer = orders
       .map((o) => {
