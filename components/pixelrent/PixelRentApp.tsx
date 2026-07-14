@@ -7,7 +7,7 @@ import CartPage from "./CartPage";
 import SettingsPage from "./SettingsPage";
 import { AuthModal, PageId, UserProfile, AppNotification } from "./shared";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "../../lib/firebase";
 
 // useLayoutEffect on the client (runs before paint), useEffect on the
@@ -139,6 +139,18 @@ export default function PixelRentApp() {
     setUser(null);
   };
 
+  /* Profile / address edits update the session immediately AND persist to
+     Firestore, so they survive a refresh (which re-hydrates from Firestore). */
+  const handleUpdateUser = (profile: UserProfile) => {
+    setUser(profile);
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      setDoc(doc(db, "users", uid), profile, { merge: true }).catch(() => {
+        /* offline / rules — the on-screen copy is still updated */
+      });
+    }
+  };
+
   /* "In Cart" in the game popup -> jump to the cart and pulse that game. */
   const viewInCart = (id: string) => {
     setHighlightId(id);
@@ -217,7 +229,7 @@ export default function PixelRentApp() {
         <SettingsPage
           onNavigate={setPage}
           user={user}
-          onUpdateUser={setUser}
+          onUpdateUser={handleUpdateUser}
           onLogout={logout}
           cartCount={cartCount}
           notifications={notifications}
