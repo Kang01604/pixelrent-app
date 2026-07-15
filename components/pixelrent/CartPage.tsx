@@ -524,6 +524,13 @@ export default function CartPage({
     });
 
   const selectedItems = cart.filter((c) => selected.has(cartRowKey(c)));
+
+  /* Select-all / clear-all: the header checkbox selects every row, and
+     once everything is selected the same control clears the selection. */
+  const allSelected = cart.length > 0 && selectedItems.length === cart.length;
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(cart.map((item) => cartRowKey(item))));
+
   const count = selectedItems.reduce((n, c) => n + c.qty, 0);
   const subtotal = selectedItems.reduce((sum, c) => sum + c.game.price * c.qty, 0);
   const vat = Math.round(subtotal * VAT_RATE * 100) / 100;
@@ -589,13 +596,17 @@ export default function CartPage({
     });
   };
 
-  /* Closing the success panel is what commits the order client-side. */
+  /* Closing the success panel is what commits the order client-side.
+     Reset every bit of checkout state so the cart is clean afterwards. */
   const finishPayment = () => {
     if (payment?.stage !== "done") return;
     onOrderPlaced(payment.orderId, payment.lines, payment.total);
     onRemoveItems(selectedItems.map(cartRowKey));
     setSelected(new Set());
     setPayment(null);
+    setCheckoutOpen(false);
+    setEditingKey(null);
+    setCheckoutError("");
     setToast("Order placed!");
   };
 
@@ -624,6 +635,26 @@ export default function CartPage({
           <section aria-label="Cart items" className="min-w-0 rounded-[28px] bg-white/20 p-4 backdrop-blur-md sm:p-8">
             <h2 className="font-condensed text-2xl text-white sm:text-3xl">My Cart ({cart.length})</h2>
             <hr className="mt-3 border-white/60" />
+
+            {cart.length > 0 && (
+              <div className="mt-4 flex items-center gap-3">
+                <Checkbox
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  label={allSelected ? "Clear all" : "Select all"}
+                />
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="font-condensed text-base text-white outline-none transition hover:text-[#15f5ea] focus-visible:ring-2 focus-visible:ring-[#15f5ea]"
+                >
+                  {allSelected ? "Clear all" : "Select all"}
+                </button>
+                <span className="font-condensed text-sm text-white/60">
+                  {selected.size} of {cart.length} selected
+                </span>
+              </div>
+            )}
 
             <div className="mt-5 max-h-[60vh] overflow-y-auto rounded-2xl bg-[#f3eef8] px-3 py-1 sm:px-8">
               {cart.length > 0 ? (
@@ -776,7 +807,7 @@ function SimulatedPaymentModal({
               money was charged and no card details were processed.
             </p>
 
-            <ul className="mt-4 space-y-1 text-left">
+            <ul className="mt-4 max-h-[32vh] space-y-1 overflow-y-auto pr-1 text-left">
               {payment.lines.map((line, i) => (
                 <li key={i} className="truncate font-condensed text-base text-white/90">
                   {line}
