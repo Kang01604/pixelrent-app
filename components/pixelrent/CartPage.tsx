@@ -26,6 +26,27 @@ const peso = (n: number) => `₱${n.toFixed(2)}`;
 
 /* ----------------------- Pieces ----------------------- */
 
+/** Trash icon used by the remove actions. */
+function TrashIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
 /** Rounded checkbox: purple outline, fills purple when checked. */
 function Checkbox({
   checked,
@@ -93,6 +114,7 @@ function CartRow({
   onToggle,
   onSetQty,
   onEditDates,
+  onRemove,
   highlighted,
   onClearHighlight,
 }: {
@@ -101,6 +123,7 @@ function CartRow({
   onToggle: () => void;
   onSetQty: (qty: number) => void;
   onEditDates: () => void;
+  onRemove: () => void;
   highlighted: boolean;
   onClearHighlight: () => void;
 }) {
@@ -153,9 +176,25 @@ function CartRow({
       </div>
 
       {/* Price drops to its own right-aligned line on narrow screens */}
-      <p className="w-full text-right font-condensed text-xl text-[#6d2f98] sm:w-auto sm:shrink-0 sm:text-3xl">
-        {peso(game.price * qty)}
-      </p>
+      <div className="flex w-full items-center justify-end gap-3 sm:w-auto sm:shrink-0">
+        <p className="text-right font-condensed text-xl text-[#6d2f98] sm:text-3xl">
+          {peso(game.price * qty)}
+        </p>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          aria-label={`Remove ${game.name} from cart`}
+          title="Remove from cart"
+          className="rounded-md p-1.5 text-[#3a3a3a]/60 outline-none transition
+                     hover:scale-110 hover:text-[#d92d4b]
+                     focus-visible:ring-2 focus-visible:ring-[#15f5ea] active:scale-90"
+        >
+          <TrashIcon className="h-5 w-5" />
+        </button>
+      </div>
     </li>
   );
 }
@@ -531,6 +570,30 @@ export default function CartPage({
   const toggleAll = () =>
     setSelected(allSelected ? new Set() : new Set(cart.map((item) => cartRowKey(item))));
 
+  /* Remove every selected row (the bulk action next to Select all). */
+  const removeSelected = () => {
+    if (selectedItems.length === 0) return;
+    const keys = selectedItems.map(cartRowKey);
+    onRemoveItems(keys);
+    setSelected(new Set());
+    setToast(
+      selectedItems.length === 1
+        ? "Item removed from cart."
+        : `${selectedItems.length} items removed from cart.`,
+    );
+  };
+
+  /* Remove a single row (the trash button on each item). */
+  const removeOne = (key: string, name: string) => {
+    onRemoveItems([key]);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+    setToast(`${name} removed from cart.`);
+  };
+
   const count = selectedItems.reduce((n, c) => n + c.qty, 0);
   const subtotal = selectedItems.reduce((sum, c) => sum + c.game.price * c.qty, 0);
   const vat = Math.round(subtotal * VAT_RATE * 100) / 100;
@@ -653,6 +716,20 @@ export default function CartPage({
                 <span className="font-condensed text-sm text-white/60">
                   {selected.size} of {cart.length} selected
                 </span>
+
+                {selectedItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={removeSelected}
+                    className="ml-auto flex items-center gap-1.5 rounded-full border border-white/40 px-3 py-1
+                               font-condensed text-sm text-white outline-none transition
+                               hover:border-[#ff6b81] hover:text-[#ff6b81]
+                               focus-visible:ring-2 focus-visible:ring-[#15f5ea] active:scale-95"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                    Remove selected ({selectedItems.length})
+                  </button>
+                )}
               </div>
             )}
 
@@ -669,6 +746,7 @@ export default function CartPage({
                         onToggle={() => toggle(key)}
                         onSetQty={(qty) => onSetQty(key, qty)}
                         onEditDates={() => setEditingKey(key)}
+                        onRemove={() => removeOne(key, item.game.name)}
                         highlighted={item.game.id === highlightId}
                         onClearHighlight={onClearHighlight}
                       />
